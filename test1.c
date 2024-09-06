@@ -6,6 +6,7 @@
 #define NODEMAX 5          // B树的阶数
 #define MAX_DEPARTMENTS 10 // 部门的数据量
 #define MAX_CHILDREN 10    // 部门的子部门数量
+#define NODEMIN (NODEMAX / 2)
 
 // 用户的结构体定义
 typedef struct
@@ -117,6 +118,18 @@ void printDepartment(DepartmentNode *department);                               
 DepartmentNode *findDepartmentById(DepartmentNode *head, const char *id);                                      // 查找部门节点通过部门ID
 DepartmentNode *userDepartment(char *userId);                                                                  // 判断用户是否是部门领导
 int isUserInControl(User *user);                                                                               // 判断用户是否收到当前用户控制
+void printSelfInfo();                                                                                          // 打印当前用户的信息
+void editSelfInfo();                                                                                           // 修改当前用户信息
+void updateUserInfo(BTreeNode *node, User *userOld, User *userNew, int (*compare)(User *, User *));            // 更新用户信息
+void merge(BTreeNode *node, int idx);                                                                          // 合并子节点
+void deleteFromNonLeaf(BTreeNode *node, int idx, int (*compare)(User *, User *));                              // 从非叶子节点删除用户
+void deleteFromLeaf(BTreeNode *node, int idx);                                                                 // 从叶子节点删除用户
+void borrowFromPrev(BTreeNode *node, int idx);                                                                 // 从左边兄弟节点借用户
+void borrowFromNext(BTreeNode *node, int idx);                                                                 // 从右边兄弟节点借用户
+void deleteUser(BTreeNode *node, User *user, int (*compare)(User *, User *));                                  // 删除用户
+void printBTree(BTreeNode *node, int level);                                                                   // 打印B树的节点内容
+void printBTreeRoot(BTreeNode *node);                                                                          // 打印B树的根节点内容
+void editStudentInfoPannel();                                                                                        // 修改学生信息
 
 // 创建新部门节点
 DepartmentNode *createDepartmentNode(const char *id, const char *name, User *leader)
@@ -147,12 +160,26 @@ void insertDepartment(DepartmentNode **head, DepartmentNode *newNode)
     *head = newNode;
 }
 
+// 打印当前用户的信息
+void printSelfInfo()
+{
+    int userIndex = currentUser - users; // 获取当前用户在users数组中的索引
+    printf("当前用户信息：\n");
+    printf("学号: %s\n", currentUser->id);
+    printf("姓名: %s\n", currentUser->name);
+    printf("邮箱: %s\n", currentUser->email);
+    printf("电话: %s\n", currentUser->phone);
+    printf("所在部门: %s\n", userNodes[userIndex].department->name);
+    printf("性别: %s\n", currentUser->gender);
+    printf("上级部门: %s\n", userNodes[userIndex].department->parent == NULL ? "无" : userNodes[userIndex].department->parent->name);
+}
+
 // 打印用户信息
 void printUser(UserNode *user)
 {
     if (user == NULL)
     {
-        printf("未找到该用户\n");
+        printf("未找到用户\n");
         return;
     }
     printf("学号: %s\n", user->id);
@@ -161,6 +188,72 @@ void printUser(UserNode *user)
     printf("电话: %s\n", user->phone);
     printf("部门: %s\n", user->department->name);
     printf("性别: %s\n", user->gender);
+}
+
+// 修改学生信息
+void editStudentInfoPannel()
+{
+    printf("请输入你要进行的操作:\n");
+    printf("1. 修改学生信息\n");
+    printf("2. 删除学生信息\n");
+    printf("3. 新增学生信息\n");
+    printf("4. 返回\n");
+    int choice;
+    scanf("%d", &choice);
+    switch (choice)
+    {
+    case 1:
+        editSelfInfo();
+        break;
+    case 2:
+        deleteStudentInfo();
+        break;
+    case 3:
+        addStudentInfo();
+        break;
+    case 4:
+        defaultPannel();
+        break;
+    default:
+        printf("输入错误，请重新输入\n");
+        editStudentInfoPannel();
+        break;
+    }
+
+}
+
+// 修改当前用户信息
+void editSelfInfo()
+{
+    int userIndex = currentUser - users; // 获取当前用户在users数组中的索引
+    char name[40], email[40], phone[40];
+    printf("当前用户信息：\n");
+    printUser(&userNodes[userIndex]);
+    printf("请输入新的信息：\n");
+    printf("姓名: ");
+    scanf("%s", name);
+    printf("邮箱: ");
+    scanf("%s", email);
+    printf("电话: ");
+    scanf("%s", phone);
+    char prefixNew[40];
+    strcpy(users[userIndex].name, name);
+    strcpy(users[userIndex].email, email);
+    strcpy(users[userIndex].phone, phone);
+    updateUserInfo(phoneRoot, currentUser, &users[userIndex], compareByPhone); // 修改B树结构中的电话信息
+    updateUserInfo(nameRoot, currentUser, &users[userIndex], compareByName);   // 修改B树结构中的姓名信息
+    strcpy(currentUser->name, name);
+    strcpy(currentUser->email, email);
+    strcpy(currentUser->phone, phone);
+    strcpy(userNodes[userIndex].name, name);
+    strcpy(userNodes[userIndex].email, email);
+    strcpy(userNodes[userIndex].phone, phone);
+    printf("%d\n", userIndex);
+    strcpy(users[userIndex].name, name);
+    strcpy(users[userIndex].email, email);
+    strcpy(users[userIndex].phone, phone);
+    // 修改B树结构中的信息
+    printf("修改成功\n");
 }
 
 // 设置父部门
@@ -181,6 +274,254 @@ void addChild(DepartmentNode *parent, DepartmentNode *child)
     {
         printf("子部门数量超过限制\n");
     }
+}
+
+// 合并子节点
+void merge(BTreeNode *node, int idx)
+{
+    BTreeNode *child = node->children[idx];
+    BTreeNode *sibling = node->children[idx + 1];
+
+    // 将父节点中的键下降到子节点
+    child->users[NODEMIN] = node->users[idx];
+
+    // 将兄弟节点中的键和子节点移到当前子节点
+    for (int i = 0; i < sibling->count; i++)
+    {
+        child->users[i + NODEMIN + 1] = sibling->users[i];
+    }
+    if (!child->isLeaf)
+    {
+        for (int i = 0; i <= sibling->count; i++)
+        {
+            child->children[i + NODEMIN + 1] = sibling->children[i];
+        }
+    }
+
+    // 移动父节点中的键和子节点
+    for (int i = idx; i < node->count - 1; i++)
+    {
+        node->users[i] = node->users[i + 1];
+        node->children[i + 1] = node->children[i + 2];
+    }
+
+    child->count += sibling->count + 1;
+    node->count--;
+
+    free(sibling);
+}
+
+// 从非叶子节点删除用户
+void deleteFromNonLeaf(BTreeNode *node, int idx, int (*compare)(User *, User *))
+{
+    User *user = node->users[idx];
+
+    if (node->children[idx]->count >= NODEMIN + 1)
+    {
+        // 左子树的最大值
+        BTreeNode *current = node->children[idx];
+        while (!current->isLeaf)
+        {
+            current = current->children[current->count];
+        }
+        node->users[idx] = current->users[current->count - 1];
+        deleteUser(node->children[idx], current->users[current->count - 1], compare);
+    }
+    else if (node->children[idx + 1]->count >= NODEMIN + 1)
+    {
+        // 右子树的最小值
+        BTreeNode *current = node->children[idx + 1];
+        while (!current->isLeaf)
+        {
+            current = current->children[0];
+        }
+        node->users[idx] = current->users[0];
+        deleteUser(node->children[idx + 1], current->users[0], compare);
+    }
+    else
+    {
+        merge(node, idx);
+        deleteUser(node->children[idx], user, compare);
+    }
+}
+
+// 从叶子节点删除用户
+void deleteFromLeaf(BTreeNode *node, int idx)
+{
+    for (int i = idx + 1; i < node->count; i++)
+    {
+        node->users[i - 1] = node->users[i];
+    }
+    node->count--;
+}
+
+// 借兄弟节点中的用户
+void borrowFromPrev(BTreeNode *node, int idx)
+{
+    BTreeNode *child = node->children[idx];
+    BTreeNode *sibling = node->children[idx - 1];
+
+    for (int i = child->count - 1; i >= 0; i--)
+    {
+        child->users[i + 1] = child->users[i];
+    }
+    if (!child->isLeaf)
+    {
+        for (int i = child->count; i >= 0; i--)
+        {
+            child->children[i + 1] = child->children[i];
+        }
+    }
+
+    child->users[0] = node->users[idx - 1];
+    if (!node->isLeaf)
+    {
+        child->children[0] = sibling->children[sibling->count];
+    }
+
+    node->users[idx - 1] = sibling->users[sibling->count - 1];
+    child->count++;
+    sibling->count--;
+}
+
+// 从右边兄弟节点借用户
+void borrowFromNext(BTreeNode *node, int idx)
+{
+    BTreeNode *child = node->children[idx];
+    BTreeNode *sibling = node->children[idx + 1];
+
+    child->users[child->count] = node->users[idx];
+    if (!child->isLeaf)
+    {
+        child->children[child->count + 1] = sibling->children[0];
+    }
+
+    node->users[idx] = sibling->users[0];
+    for (int i = 1; i < sibling->count; i++)
+    {
+        sibling->users[i - 1] = sibling->users[i];
+    }
+    if (!sibling->isLeaf)
+    {
+        for (int i = 1; i <= sibling->count; i++)
+        {
+            sibling->children[i - 1] = sibling->children[i];
+        }
+    }
+
+    child->count++;
+    sibling->count--;
+}
+
+void printBTree(BTreeNode *node, int level)
+{
+    if (node == NULL)
+    {
+        return;
+    }
+
+    // 打印当前节点的所有用户数据
+    for (int i = 0; i < node->count; i++)
+    {
+        for (int j = 0; j < level; j++)
+        {
+            printf("\t"); // 根据层级缩进
+        }
+        int userIndex = node->users[i] - users; // 获取用户在users数组中的索引
+        printf("In:%d", userIndex);
+        printf("Index %d: Name: %s\n",
+               i, node->users[i]->name); // 打印用户名
+    }
+
+    // 打印子节点
+    if (!node->isLeaf)
+    {
+        for (int i = 0; i <= node->count; i++)
+        {
+            printBTree(node->children[i], level + 1);
+        }
+    }
+}
+
+// 调用函数打印整个B树
+void printBTreeRoot(BTreeNode *root)
+{
+    printf("Printing B-Tree:\n");
+    printBTree(root, 0); // 从根节点开始，层级为0
+}
+
+// 删除函数
+void deleteUser(BTreeNode *node, User *user, int (*compare)(User *, User *))
+{
+    int idx = 0;
+    while (idx < node->count && compare(user, node->users[idx]) > 0)
+    {
+        idx++;
+    }
+
+    if (idx < node->count && compare(user, node->users[idx]) == 0)
+    {
+        if (node->isLeaf)
+        {
+            deleteFromLeaf(node, idx);
+        }
+        else
+        {
+            deleteFromNonLeaf(node, idx, compare);
+        }
+    }
+    else
+    {
+        if (node->isLeaf)
+        {
+            printf("用户未找到\n");
+            return;
+        }
+
+        int flag = (idx == node->count);
+
+        if (node->children[idx]->count < NODEMIN + 1)
+        {
+            if (idx != 0 && node->children[idx - 1]->count >= NODEMIN + 1)
+            {
+                borrowFromPrev(node, idx);
+            }
+            else if (idx != node->count && node->children[idx + 1]->count >= NODEMIN + 1)
+            {
+                borrowFromNext(node, idx);
+            }
+            else
+            {
+                if (idx != node->count)
+                {
+                    merge(node, idx);
+                }
+                else
+                {
+                    merge(node, idx - 1);
+                }
+            }
+        }
+
+        if (flag && idx > node->count)
+        {
+            deleteUser(node->children[idx - 1], user, compare);
+        }
+        else
+        {
+            deleteUser(node->children[idx], user, compare);
+        }
+    }
+}
+
+// 修改用户信息的函数
+void updateUserInfo(BTreeNode *anyRoot, User *oldUser, User *newUser, int (*compareBy)(User *, User *))
+{
+    // 删除旧用户信息
+    deleteUser(anyRoot, oldUser, compareBy);
+    printf("新用户信息：%s %s %s %s %s\n", newUser->id, newUser->name, newUser->email, newUser->phone, newUser->departmentId);
+    // 插入更新后的用户信息
+    insert(&anyRoot, newUser, compareBy);
 }
 
 // 将Department数组转换为链表节点并插入链表
@@ -898,8 +1239,10 @@ void studentSelfManagePannel()
         {
         case 1:
             // 查看个人信息
+            printSelfInfo();
             break;
         case 2:
+            editSelfInfo();
             // 修改个人信息
             break;
         case 3:
@@ -950,9 +1293,11 @@ void studentManagePannel()
     {
     case 1:
         // 查看个人信息
+        printSelfInfo();
         break;
     case 2:
         // 修改个人信息
+        editSelfInfo();
         break;
     case 3:
         // 向部门负责人发送消息
@@ -1036,7 +1381,6 @@ void init(User users[], Department departments[], UserNode userNodes[], int *use
         insert(&idRoot, &users[i], compareByID);       // 添加到学号树
         insert(&nameRoot, &users[i], compareByName);   // 添加到姓名树
         insert(&phoneRoot, &users[i], compareByPhone); // 添加到电话树
-        // printf("%s %s %s %s %s %s\n", users[i].id, users[i].name, users[i].email, users[i].phone, users[i].departmentId, users[i].gender);
     }
 
     loadDepartments(departments, departmentCount);
@@ -1053,21 +1397,6 @@ void init(User users[], Department departments[], UserNode userNodes[], int *use
         userNodes[i].department = findDepartmentById(current, users[i].departmentId);
         strcpy(userNodes[i].gender, users[i].gender);
     }
-    // 打印部门信息
-    // printDepartment(findDepartmentById(departmentHead, "291144669141"));
-
-    User queryUser;
-    // 按学号精准查找用户
-    // strcpy(queryUser.name, "曹东");
-    // printf("Search user by name 曹东:\n");
-    // User *user = searchById(nameRoot, &queryUser, compareByName);
-    // printf("学号: %s, 姓名: %s, 邮箱: %s, 电话: %s, 部门: %s, 性别: %s\n", user->id, user->name, user->email, user->phone, userNodes[user - users].department->name, user->gender);
-
-    // printf("Search ID range 2235062001 to 2235062030:\n");
-    // searchByIDRange(idRoot, "2235062001", "2235062030");
-
-    // printf("\nSearch ID prefix '213505':\n");
-    // searchByIDPrefix(idRoot, "213505");
 }
 
 int main()
