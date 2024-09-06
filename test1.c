@@ -116,8 +116,10 @@ void setParent(DepartmentNode *department, DepartmentNode *parent);             
 void addChild(DepartmentNode *parent, DepartmentNode *child);                                                  // 添加子部门
 void printDepartment(DepartmentNode *department);                                                              // 打印部门信息
 DepartmentNode *findDepartmentById(DepartmentNode *head, const char *id);                                      // 查找部门节点通过部门ID
+DepartmentNode *findDepartmentByName(DepartmentNode *head, const char *name);                                  // 查找部门节点通过部门名称
 DepartmentNode *userDepartment(char *userId);                                                                  // 判断用户是否是部门领导
 int isUserInControl(User *user);                                                                               // 判断用户是否收到当前用户控制
+int isDepartmentInControl(DepartmentNode *department);                                                         // 判断部门是否受到当前用户控制
 void printSelfInfo();                                                                                          // 打印当前用户的信息
 void editSelfInfo();                                                                                           // 修改当前用户信息
 void updateUserInfo(BTreeNode *node, User *userOld, User *userNew, int (*compare)(User *, User *));            // 更新用户信息
@@ -129,7 +131,9 @@ void borrowFromNext(BTreeNode *node, int idx);                                  
 void deleteUser(BTreeNode *node, User *user, int (*compare)(User *, User *));                                  // 删除用户
 void printBTree(BTreeNode *node, int level);                                                                   // 打印B树的节点内容
 void printBTreeRoot(BTreeNode *node);                                                                          // 打印B树的根节点内容
-void editStudentInfoPannel();                                                                                        // 修改学生信息
+void editStudentInfoPannel();                                                                                  // 修改学生信息
+void editStudentInfo(User *user);                                                                              // 修改学生信息面板
+void editDepartmentNamePannel();                                                                               // 修改部门名称面板
 
 // 创建新部门节点
 DepartmentNode *createDepartmentNode(const char *id, const char *name, User *leader)
@@ -191,6 +195,31 @@ void printUser(UserNode *user)
 }
 
 // 修改学生信息
+void editStudentInfo(User *user)
+{
+    char name[40], email[40], phone[40];
+    int userIndex = user - users;
+    printf("当前学生信息：\n");
+    printUser(&userNodes[userIndex]);
+    printf("请输入新的信息：\n");
+    printf("姓名: ");
+    scanf("%s", name);
+    printf("邮箱: ");
+    scanf("%s", email);
+    printf("电话: ");
+    scanf("%s", phone);
+    strcpy(users[userIndex].name, name);
+    strcpy(users[userIndex].email, email);
+    strcpy(users[userIndex].phone, phone);
+    strcpy(userNodes[userIndex].name, name);
+    strcpy(userNodes[userIndex].email, email);
+    strcpy(userNodes[userIndex].phone, phone);
+    updateUserInfo(nameRoot, user, &users[userIndex], compareByName);
+    updateUserInfo(phoneRoot, user, &users[userIndex], compareByPhone);
+    printf("修改成功\n");
+}
+
+// 修改学生信息面板
 void editStudentInfoPannel()
 {
     printf("请输入你要进行的操作:\n");
@@ -198,28 +227,57 @@ void editStudentInfoPannel()
     printf("2. 删除学生信息\n");
     printf("3. 新增学生信息\n");
     printf("4. 返回\n");
+    char studentId[20];
     int choice;
+    printf("请选择: ");
     scanf("%d", &choice);
-    switch (choice)
+    if (choice != 4)
     {
-    case 1:
-        editSelfInfo();
-        break;
-    case 2:
-        deleteStudentInfo();
-        break;
-    case 3:
-        addStudentInfo();
-        break;
-    case 4:
-        defaultPannel();
-        break;
-    default:
-        printf("输入错误，请重新输入\n");
-        editStudentInfoPannel();
-        break;
+        printf("请输入学生学号: ");
+        scanf("%s", studentId);
+        User queryUser;
+        switch (choice)
+        {
+        case 1:
+            strcpy(queryUser.id, studentId);
+            User *editedUser = searchById(idRoot, &queryUser, compareByID);
+            if (editedUser != NULL)
+            {
+                editStudentInfo(editedUser);
+            }
+            else
+            {
+                printf("未找到学生\n");
+            }
+            break;
+        case 2:
+            strcpy(queryUser.id, studentId);
+            User *deletedUser = searchById(idRoot, &queryUser, compareByID);
+            if (deletedUser != NULL)
+            {
+                deleteUser(idRoot, deletedUser, compareByID);
+                deleteUser(nameRoot, deletedUser, compareByName);
+                deleteUser(phoneRoot, deletedUser, compareByPhone);
+                printf("删除成功\n");
+            }
+            else
+            {
+                printf("未找到学生\n");
+            }
+            break;
+        case 3:
+            // addStudentInfo();
+            break;
+        default:
+            printf("输入错误，请重新输入\n");
+            editStudentInfoPannel();
+            break;
+        }
     }
-
+    else
+    {
+        studentManagePannel();
+    }
 }
 
 // 修改当前用户信息
@@ -353,6 +411,29 @@ void deleteFromLeaf(BTreeNode *node, int idx)
         node->users[i - 1] = node->users[i];
     }
     node->count--;
+}
+
+// 修改部门名称面板
+void editDepartmentNamePannel()
+{
+    printf("请输入原来部门名称：");
+    char departmentName[40];
+    scanf("%s", departmentName);
+    DepartmentNode *department = findDepartmentByName(departmentHead, departmentName);
+    if (department != NULL)
+    {
+        printf("找到部门信息：\n");
+        printDepartment(department);
+        printf("请输入新的部门名称: ");
+        char name[40];
+        scanf("%s", name);
+        strcpy(department->name, name);
+        printf("修改成功\n");
+    }
+    else
+    {
+        printf("未找到部门或权限不足\n");
+    }
 }
 
 // 借兄弟节点中的用户
@@ -519,7 +600,6 @@ void updateUserInfo(BTreeNode *anyRoot, User *oldUser, User *newUser, int (*comp
 {
     // 删除旧用户信息
     deleteUser(anyRoot, oldUser, compareBy);
-    printf("新用户信息：%s %s %s %s %s\n", newUser->id, newUser->name, newUser->email, newUser->phone, newUser->departmentId);
     // 插入更新后的用户信息
     insert(&anyRoot, newUser, compareBy);
 }
@@ -623,6 +703,21 @@ void printDepartment(DepartmentNode *department)
         printf("%s ", department->children[i]->name);
     }
     printf("\n");
+}
+
+// 查找部门节点通过部门名称
+DepartmentNode *findDepartmentByName(DepartmentNode *head, const char *name)
+{
+    DepartmentNode *current = head;
+    while (current != NULL)
+    {
+        if (strcmp(current->name, name) == 0 && isDepartmentInControl(current))
+        {
+            return current;
+        }
+        current = current->next;
+    }
+    return NULL;
 }
 
 // 查找部门节点通过部门ID
@@ -832,6 +927,23 @@ int compareByName(User *user1, User *user2)
 int compareByPhone(User *user1, User *user2)
 {
     return strcmp(user1->phone, user2->phone);
+}
+
+// 判断部门是否受到当前用户控制
+int isDepartmentInControl(DepartmentNode *department)
+{
+    // 利用链表，查看部门是否是当前用户所管辖的部门
+    DepartmentNode *current = department;
+    DepartmentNode *target = currentDepartment;
+    while (current != NULL)
+    {
+        if (strcmp(current->id, target->id) == 0)
+        {
+            return 1;
+        }
+        current = current->parent;
+    }
+    return 0;
 }
 
 // 判断用户是否收到当前用户控制
@@ -1246,10 +1358,10 @@ void studentSelfManagePannel()
             // 修改个人信息
             break;
         case 3:
-            // 向部门负责人发送消息
+            // TODO 向部门负责人发送消息
             break;
         case 4:
-            // 查看消息列表
+            // TODO 查看消息列表
             break;
         case 5:
             // 查看部门信息
@@ -1300,16 +1412,16 @@ void studentManagePannel()
         editSelfInfo();
         break;
     case 3:
-        // 向部门负责人发送消息
+        // TODO 向部门负责人发送消息
         break;
     case 4:
-        // 查看消息列表
+        // TODO 查看消息列表
         break;
     case 5:
-        // 向特定用户发送消息
+        // TODO 向特定用户发送消息
         break;
     case 6:
-        // 向用户群发消息
+        // TODO 向用户群发消息
         break;
     case 7:
         // 查询用户信息
@@ -1317,9 +1429,11 @@ void studentManagePannel()
         break;
     case 8:
         // 修改用户信息
+        editStudentInfoPannel();
         break;
     case 9:
         // 修改部门名称
+        editDepartmentNamePannel();
         break;
     case 10:
         // 查看自己可以管理的部门
