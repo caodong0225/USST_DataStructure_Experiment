@@ -133,7 +133,10 @@ void printBTree(BTreeNode *node, int level);                                    
 void printBTreeRoot(BTreeNode *node);                                                                          // 打印B树的根节点内容
 void editStudentInfoPannel();                                                                                  // 修改学生信息
 void editStudentInfo(User *user);                                                                              // 修改学生信息面板
-void editDepartmentNamePannel();                                                                               // 修改部门名称面板
+void editDepartmentNamePannel();                                                                               // 修改部门信息面板
+void addStudentInfo(User *user);                                                                               // 添加学生信息
+void editDepartmentName();                                                                                     // 修改部门名称
+void editDepartmentLeader();                                                                                   // 修改部门领导
 
 // 创建新部门节点
 DepartmentNode *createDepartmentNode(const char *id, const char *name, User *leader)
@@ -178,6 +181,14 @@ void printSelfInfo()
     printf("上级部门: %s\n", userNodes[userIndex].department->parent == NULL ? "无" : userNodes[userIndex].department->parent->name);
 }
 
+// 新增学生信息
+void addStudentInfo(User *user)
+{
+    insert(&idRoot, user, compareByID);
+    insert(&nameRoot, user, compareByName);
+    insert(&phoneRoot, user, compareByPhone);
+}
+
 // 打印用户信息
 void printUser(UserNode *user)
 {
@@ -192,6 +203,44 @@ void printUser(UserNode *user)
     printf("电话: %s\n", user->phone);
     printf("部门: %s\n", user->department->name);
     printf("性别: %s\n", user->gender);
+}
+
+// 修改部门领导
+void editDepartmentLeader()
+{
+    printf("请输入部门名称: ");
+    char departmentName[40];
+    scanf("%s", departmentName);
+    DepartmentNode *department = findDepartmentByName(departmentHead, departmentName);
+    if (department != NULL)
+    {
+        if(strcmp(department->leader->id, currentUser->id) == 0) {
+            printf("不能转让权限\n");
+            return;
+        }
+        printf("找到部门信息：\n");
+        printDepartment(department);
+        printf("请输入新的部门领导学号: ");
+        char leaderId[40];
+        scanf("%s", leaderId);
+        User queryUser;
+        strcpy(queryUser.id, leaderId);
+        UserNode *leader = searchNodeById(idRoot, &queryUser, compareByID);
+        if (leader != NULL)
+        {
+            int userIndex = leader - userNodes;
+            department->leader = &users[userIndex];
+            printf("修改成功\n");
+        }
+        else
+        {
+            printf("未找到用户\n");
+        }
+    }
+    else
+    {
+        printf("未找到部门或权限不足\n");
+    }
 }
 
 // 修改学生信息
@@ -240,9 +289,11 @@ void editStudentInfoPannel()
         {
         case 1:
             strcpy(queryUser.id, studentId);
-            User *editedUser = searchById(idRoot, &queryUser, compareByID);
-            if (editedUser != NULL)
+            // 鉴权，查看能否修改学生
+            UserNode *editedUserNode = searchNodeById(idRoot, &queryUser, compareByID);
+            if (editedUserNode != NULL)
             {
+                User *editedUser = searchById(idRoot, &queryUser, compareByID);
                 editStudentInfo(editedUser);
             }
             else
@@ -252,12 +303,13 @@ void editStudentInfoPannel()
             break;
         case 2:
             strcpy(queryUser.id, studentId);
-            User *deletedUser = searchById(idRoot, &queryUser, compareByID);
+            UserNode *deletedUser = searchNodeById(idRoot, &queryUser, compareByID);
             if (deletedUser != NULL)
             {
-                deleteUser(idRoot, deletedUser, compareByID);
-                deleteUser(nameRoot, deletedUser, compareByName);
-                deleteUser(phoneRoot, deletedUser, compareByPhone);
+                int userIndex = deletedUser - userNodes;
+                deleteUser(idRoot, &users[userIndex], compareByID);
+                deleteUser(nameRoot, &users[userIndex], compareByName);
+                deleteUser(phoneRoot, &users[userIndex], compareByPhone);
                 printf("删除成功\n");
             }
             else
@@ -266,7 +318,58 @@ void editStudentInfoPannel()
             }
             break;
         case 3:
-            // addStudentInfo();
+            User *userExist = searchById(idRoot, &queryUser, compareByID);
+            if (userExist != NULL)
+            {
+                printf("学号已存在，请检查输入\n");
+                break;
+            }
+            printf("请输入学生信息：\n");
+            char name[40];
+            char email[40];
+            char phone[40];
+            char departmentName[40];
+            char gender[10];
+            char id[20];
+            printf("姓名: ");
+            scanf("%s", name);
+            printf("邮箱: ");
+            scanf("%s", email);
+            printf("电话: ");
+            scanf("%s", phone);
+            printf("部门名称: ");
+            scanf("%s", departmentName);
+            printf("性别: ");
+            scanf("%s", gender);
+            strcpy(queryUser.id, studentId);
+            DepartmentNode *department = findDepartmentByName(departmentHead, departmentName); // 查找部门
+            if (department != NULL)
+            {
+                User newUser;
+                strcpy(newUser.id, studentId);
+                strcpy(newUser.name, name);
+                strcpy(newUser.email, email);
+                strcpy(newUser.phone, phone);
+                strcpy(newUser.departmentId, department->id);
+                strcpy(newUser.gender, gender);
+                // 添加到users数组当中
+                users[userCount] = newUser;
+                UserNode userNode;
+                strcpy(userNode.id, studentId);
+                strcpy(userNode.name, name);
+                strcpy(userNode.email, email);
+                strcpy(userNode.phone, phone);
+                userNode.department = department;
+                strcpy(userNode.gender, gender);
+                userNodes[userCount] = userNode;
+                addStudentInfo(&users[userCount]); // 添加学生信息
+                userCount++;
+                printf("添加成功\n");
+            }
+            else
+            {
+                printf("未找到部门或权限不足，请检查输入\n");
+            }
             break;
         default:
             printf("输入错误，请重新输入\n");
@@ -413,8 +516,7 @@ void deleteFromLeaf(BTreeNode *node, int idx)
     node->count--;
 }
 
-// 修改部门名称面板
-void editDepartmentNamePannel()
+void editDepartmentName()
 {
     printf("请输入原来部门名称：");
     char departmentName[40];
@@ -427,12 +529,48 @@ void editDepartmentNamePannel()
         printf("请输入新的部门名称: ");
         char name[40];
         scanf("%s", name);
+        if (findDepartmentByName(departmentHead, name) != NULL)
+        {
+            printf("部门名称已存在，请检查输入\n");
+            return;
+        }
         strcpy(department->name, name);
         printf("修改成功\n");
     }
     else
     {
         printf("未找到部门或权限不足\n");
+    }
+}
+
+// 修改部门信息面板
+void editDepartmentNamePannel()
+{
+    printf("请输入你要进行的操作:\n");
+    printf("1. 修改部门名称\n");
+    printf("2. 修改部门管理员\n");
+    printf("3. 返回\n");
+    int choice;
+    printf("请选择: ");
+    scanf("%d", &choice);
+    switch (choice)
+    {
+    case 1:
+        // 修改部门名称
+        editDepartmentName();
+        break;
+    case 2:
+        // 修改部门管理员
+        editDepartmentLeader();
+        break;
+    case 3:
+        // 返回
+        studentManagePannel();
+        break;
+    default:
+        printf("输入错误，请重新输入\n");
+        editDepartmentNamePannel();
+        break;
     }
 }
 
@@ -1298,9 +1436,9 @@ void searchPannel()
 // 登录面板
 void defaultPannel()
 {
-    // system("cls");
+    system("cls");
     printf("************************************************\n");
-    printf("欢迎登陆学生信息管理系统!请选择：\n");
+    printf("欢迎登录学生信息管理系统!请选择：\n");
     printf("1. 登录\n");
     printf("2. 退出系统\n");
     printf("************************************************\n");
@@ -1393,7 +1531,7 @@ void studentManagePannel()
     printf("6. 向用户群发消息\n");
     printf("7. 查询用户信息\n");
     printf("8. 修改用户信息\n");
-    printf("9. 修改部门名称\n");
+    printf("9. 修改部门信息\n");
     printf("10. 查看自己管辖部门信息\n");
     printf("11. 查看自己所处部门信息\n");
     printf("12. 返回上一级\n");
@@ -1432,7 +1570,7 @@ void studentManagePannel()
         editStudentInfoPannel();
         break;
     case 9:
-        // 修改部门名称
+        // 修改部门信息
         editDepartmentNamePannel();
         break;
     case 10:
