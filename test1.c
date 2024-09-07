@@ -7,7 +7,6 @@
 #define MAX_DEPARTMENTS 10 // 部门的数据量
 #define MAX_CHILDREN 10    // 部门的子部门数量
 #define NODEMIN (NODEMAX / 2)
-#define MESSAGE 100 // 消息的数据量
 
 // 用户的结构体定义
 typedef struct
@@ -180,6 +179,11 @@ void sendMessageToTargetUser()
         printf("请输入消息内容: ");
         scanf("%s", content);
         MessageNode *newMessage = (MessageNode *)malloc(sizeof(MessageNode));
+        if (newMessage == NULL)
+        {
+            printf("内存分配失败\n");
+            exit(1);
+        }
         newMessage->sender = currentUser;
         strcpy(newMessage->content, content);
         // 插入消息节点到链表头部
@@ -205,6 +209,11 @@ void pushGroupMessage()
         if (isUserInControl(user) && strcmp(user->id, currentUser->id) != 0)
         {
             MessageNode *newMessage = (MessageNode *)malloc(sizeof(MessageNode));
+            if (newMessage == NULL)
+            {
+                printf("内存分配失败\n");
+                exit(1);
+            }
             newMessage->sender = currentUser;
             strcpy(newMessage->content, content);
             // 插入消息节点到链表头部
@@ -226,6 +235,11 @@ void sendMessageToLeader()
         printf("请输入消息内容: ");
         scanf("%s", content);
         MessageNode *newMessage = (MessageNode *)malloc(sizeof(MessageNode));
+        if (newMessage == NULL)
+        {
+            printf("内存分配失败\n");
+            exit(1);
+        }
         newMessage->sender = currentUser;
         strcpy(newMessage->content, content);
         // 插入消息节点到链表头部
@@ -1034,6 +1048,11 @@ void loadDepartments(Department departments[], int *departmentCount)
 BTreeNode *createNode(int isLeaf)
 {
     BTreeNode *newNode = (BTreeNode *)malloc(sizeof(BTreeNode));
+    if (newNode == NULL)
+    {
+        printf("内存分配失败\n");
+        exit(1);
+    }
     newNode->isLeaf = isLeaf;
     newNode->count = 0;
     for (int i = 0; i < NODEMAX + 1; i++)
