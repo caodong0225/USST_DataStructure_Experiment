@@ -141,6 +141,7 @@ void editDepartmentLeader();                                                    
 void pushGroupMessage();                                                                                       // 发送群消息
 void printMessageReceived();                                                                                   // 打印当前用户收到的消息
 void sendMessageToLeader();                                                                                    // 发送消息给部门领导
+void sendMessageToTargetUser();                                                                                // 发送消息给指定用户
 
 // 创建新部门节点
 DepartmentNode *createDepartmentNode(const char *id, const char *name, User *leader)
@@ -162,6 +163,34 @@ DepartmentNode *createDepartmentNode(const char *id, const char *name, User *lea
         newNode->children[i] = NULL; // 初始化子节点指针为空
     }
     return newNode;
+}
+
+// 发送消息给特定用户
+void sendMessageToTargetUser()
+{
+    char targetId[20];
+    printf("请输入目标用户学号: ");
+    scanf("%s", targetId);
+    User queryUser;
+    strcpy(queryUser.id, targetId);
+    UserNode *targetUser = searchNodeById(idRoot, &queryUser, compareByID);
+    if (targetUser != NULL)
+    {
+        char content[256];
+        printf("请输入消息内容: ");
+        scanf("%s", content);
+        MessageNode *newMessage = (MessageNode *)malloc(sizeof(MessageNode));
+        newMessage->sender = currentUser;
+        strcpy(newMessage->content, content);
+        // 插入消息节点到链表头部
+        newMessage->next = targetUser->messages; // 将新消息节点插入到消息链表头部
+        targetUser->messages = newMessage;
+        printf("发送成功\n");
+    }
+    else
+    {
+        printf("未找到用户\n");
+    }
 }
 
 // 群发消息
@@ -1631,7 +1660,8 @@ void studentManagePannel()
         printMessageReceived();
         break;
     case 5:
-        // TODO 向特定用户发送消息
+        // 向特定用户发送消息
+        sendMessageToTargetUser();
         break;
     case 6:
         // 向用户群发消息
