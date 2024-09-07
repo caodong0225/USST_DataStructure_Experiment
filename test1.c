@@ -133,7 +133,7 @@ void printBTree(BTreeNode *node, int level);                                    
 void printBTreeRoot(BTreeNode *node);                                                                          // 打印B树的根节点内容
 void editStudentInfoPannel();                                                                                  // 修改学生信息
 void editStudentInfo(User *user);                                                                              // 修改学生信息面板
-void editDepartmentNamePannel();                                                                               // 修改部门信息面板
+void editDepartmentInfoPannel();                                                                               // 修改部门信息面板
 void addStudentInfo(User *user);                                                                               // 添加学生信息
 void editDepartmentName();                                                                                     // 修改部门名称
 void editDepartmentLeader();                                                                                   // 修改部门领导
@@ -658,7 +658,7 @@ void editDepartmentName()
 }
 
 // 修改部门信息面板
-void editDepartmentNamePannel()
+void editDepartmentInfoPannel()
 {
     printf("请输入你要进行的操作:\n");
     printf("1. 修改部门名称\n");
@@ -683,7 +683,7 @@ void editDepartmentNamePannel()
         break;
     default:
         printf("输入错误，请重新输入\n");
-        editDepartmentNamePannel();
+        editDepartmentInfoPannel();
         break;
     }
 }
@@ -1696,7 +1696,7 @@ void studentManagePannel()
         break;
     case 9:
         // 修改部门信息
-        editDepartmentNamePannel();
+        editDepartmentInfoPannel();
         break;
     case 10:
         // 查看自己可以管理的部门
