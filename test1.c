@@ -7,6 +7,7 @@
 #define MAX_DEPARTMENTS 10 // 部门的数据量
 #define MAX_CHILDREN 10    // 部门的子部门数量
 #define NODEMIN (NODEMAX / 2)
+#define MESSAGE 100 // 消息的数据量
 
 // 用户的结构体定义
 typedef struct
@@ -41,6 +42,14 @@ typedef struct DepartmentNode
     struct DepartmentNode *next;                   // 用于链表的下一个节点指针
 } DepartmentNode;
 
+// 消息节点的结构体定义
+typedef struct MessageNode
+{
+    User *sender;             // 指向发送者的指针
+    char content[256];        // 消息内容
+    struct MessageNode *next; // 指向下一条消息的指针
+} MessageNode;
+
 // 用户节点的结构体定义
 typedef struct
 {
@@ -50,16 +59,8 @@ typedef struct
     char phone[20];             // 用户的电话
     DepartmentNode *department; // 指向用户所在部门的指针
     char gender[10];            // 用户的性别
+    MessageNode *messages;      // 指向消息链表的指针
 } UserNode;
-
-// 定义消息的结构体
-typedef struct
-{
-    struct User *sender;   // 发送者的用户指针
-    struct User *receiver; // 接收者的用户指针
-    char content[100];     // 消息的内容
-    char time[20];         // 消息的发送时间
-} Message;
 
 // 定义B树的结构体
 typedef struct BTreeNode
@@ -137,6 +138,9 @@ void editDepartmentNamePannel();                                                
 void addStudentInfo(User *user);                                                                               // 添加学生信息
 void editDepartmentName();                                                                                     // 修改部门名称
 void editDepartmentLeader();                                                                                   // 修改部门领导
+void pushGroupMessage();                                                                                       // 发送群消息
+void printMessageReceived();                                                                                   // 打印当前用户收到的消息
+void sendMessageToLeader();                                                                                    // 发送消息给部门领导
 
 // 创建新部门节点
 DepartmentNode *createDepartmentNode(const char *id, const char *name, User *leader)
@@ -158,6 +162,71 @@ DepartmentNode *createDepartmentNode(const char *id, const char *name, User *lea
         newNode->children[i] = NULL; // 初始化子节点指针为空
     }
     return newNode;
+}
+
+// 群发消息
+void pushGroupMessage()
+{
+    char content[256];
+    printf("请输入消息内容: ");
+    scanf("%s", content);
+    for (int i = 0; i < userCount; i++)
+    {
+        User *user = &users[i]; // 获取用户指针
+        if (isUserInControl(user) && strcmp(user->id, currentUser->id) != 0)
+        {
+            MessageNode *newMessage = (MessageNode *)malloc(sizeof(MessageNode));
+            newMessage->sender = currentUser;
+            strcpy(newMessage->content, content);
+            // 插入消息节点到链表头部
+            newMessage->next = userNodes[i].messages; // 将新消息节点插入到消息链表头部
+            userNodes[i].messages = newMessage;
+        }
+    }
+    printf("发送成功\n");
+}
+
+// 发消息到部门领导
+void sendMessageToLeader()
+{
+    int userIndex = currentUser - users; // 获取当前用户在users数组中的索引
+    DepartmentNode *department = userNodes[userIndex].department;
+    if (department->leader != NULL)
+    {
+        char content[256];
+        printf("请输入消息内容: ");
+        scanf("%s", content);
+        MessageNode *newMessage = (MessageNode *)malloc(sizeof(MessageNode));
+        newMessage->sender = currentUser;
+        strcpy(newMessage->content, content);
+        // 插入消息节点到链表头部
+        newMessage->next = userNodes[department->leader - users].messages; // 将新消息节点插入到消息链表头部
+        userNodes[department->leader - users].messages = newMessage;
+        printf("发送成功\n");
+    }
+    else
+    {
+        printf("部门没有领导\n");
+    }
+}
+
+// 打印当前用户收到的消息
+void printMessageReceived()
+{
+    int userIndex = currentUser - users;                  // 获取当前用户在users数组中的索引
+    MessageNode *current = userNodes[userIndex].messages; // 获取当前用户的消息链表头指针
+    if (current == NULL)
+    {
+        printf("没有消息\n");
+        return;
+    }
+    printf("消息列表：\n");
+    while (current != NULL)
+    {
+        printf("发送者: %s\n", current->sender->name);
+        printf("消息内容: %s\n", current->content);
+        current = current->next;
+    }
 }
 
 // 插入部门节点到链表头部
@@ -214,7 +283,8 @@ void editDepartmentLeader()
     DepartmentNode *department = findDepartmentByName(departmentHead, departmentName);
     if (department != NULL)
     {
-        if(strcmp(department->leader->id, currentUser->id) == 0) {
+        if (strcmp(department->leader->id, currentUser->id) == 0)
+        {
             printf("不能转让权限\n");
             return;
         }
@@ -361,6 +431,7 @@ void editStudentInfoPannel()
                 strcpy(userNode.phone, phone);
                 userNode.department = department;
                 strcpy(userNode.gender, gender);
+                userNode.messages = NULL;
                 userNodes[userCount] = userNode;
                 addStudentInfo(&users[userCount]); // 添加学生信息
                 userCount++;
@@ -1496,10 +1567,12 @@ void studentSelfManagePannel()
             // 修改个人信息
             break;
         case 3:
-            // TODO 向部门负责人发送消息
+            // 向部门负责人发送消息
+            sendMessageToLeader();
             break;
         case 4:
-            // TODO 查看消息列表
+            // 查看消息列表
+            printMessageReceived();
             break;
         case 5:
             // 查看部门信息
@@ -1528,7 +1601,7 @@ void studentManagePannel()
     printf("3. 向部门负责人发送消息\n");
     printf("4. 查看消息列表\n");
     printf("5. 向特定用户发送消息\n");
-    printf("6. 向用户群发消息\n");
+    printf("6. 向所管辖的用户群发消息\n");
     printf("7. 查询用户信息\n");
     printf("8. 修改用户信息\n");
     printf("9. 修改部门信息\n");
@@ -1550,16 +1623,19 @@ void studentManagePannel()
         editSelfInfo();
         break;
     case 3:
-        // TODO 向部门负责人发送消息
+        // 向部门负责人发送消息
+        sendMessageToLeader();
         break;
     case 4:
-        // TODO 查看消息列表
+        // 查看消息列表
+        printMessageReceived();
         break;
     case 5:
         // TODO 向特定用户发送消息
         break;
     case 6:
-        // TODO 向用户群发消息
+        // 向用户群发消息
+        pushGroupMessage();
         break;
     case 7:
         // 查询用户信息
@@ -1648,6 +1724,7 @@ void init(User users[], Department departments[], UserNode userNodes[], int *use
         DepartmentNode *current = departmentHead;
         userNodes[i].department = findDepartmentById(current, users[i].departmentId);
         strcpy(userNodes[i].gender, users[i].gender);
+        userNodes[i].messages = NULL; // 初始化消息链表为空
     }
 }
 
