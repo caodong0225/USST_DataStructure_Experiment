@@ -523,7 +523,6 @@ void editSelfInfo()
     strcpy(userNodes[userIndex].name, name);
     strcpy(userNodes[userIndex].email, email);
     strcpy(userNodes[userIndex].phone, phone);
-    printf("%d\n", userIndex);
     strcpy(users[userIndex].name, name);
     strcpy(users[userIndex].email, email);
     strcpy(users[userIndex].phone, phone);
@@ -807,7 +806,7 @@ void deleteUser(BTreeNode *node, User *user, int (*compare)(User *, User *))
     {
         if (node->isLeaf)
         {
-            printf("用户未找到\n");
+            // printf("用户未找到\n");
             return;
         }
 
@@ -914,6 +913,24 @@ void convertDepartments(Department *departments, int departmentCount, Department
     }
 }
 
+// 递归深度优先搜索打印部门及其子部门
+void printDepartmentHierarchy(DepartmentNode *dept, int level) {
+    if (dept == NULL) {
+        return;
+    }
+
+    // 打印当前部门的名称和层级
+    for (int i = 0; i < level; i++) {
+        printf("  ");  // 缩进表示层级
+    }
+    printf("部门名称: %s (级别: %d)\n", dept->name, level);
+
+    // 递归遍历所有子部门
+    for (int i = 0; i < dept->numChildren; i++) {
+        printDepartmentHierarchy(dept->children[i], level + 1);
+    }
+}
+
 // 打印部门信息
 void printDepartment(DepartmentNode *department)
 {
@@ -949,11 +966,8 @@ void printDepartment(DepartmentNode *department)
     }
 
     // 打印子部门信息
-    printf("子部门: ");
-    for (int i = 0; i < department->numChildren; i++)
-    {
-        printf("%s ", department->children[i]->name);
-    }
+    printf("子部门:\n ");
+    printDepartmentHierarchy(department, 1); // 递归打印子部门
     printf("\n");
 }
 
